@@ -1,0 +1,102 @@
+name: Slack Test
+
+on:
+    push:
+        branches: main
+
+jobs:
+    build:
+        runs-on: ubuntu-22.04
+
+        steps:
+            - uses: actions/checkout@v3
+
+            - name: Set Variables
+              run: |
+                  echo "SHORT_GITHUB_SHA=${GITHUB_SHA::6}" >> $GITHUB_ENV
+
+            - name: Test Success
+              run: echo "hello world"
+
+            - name: If Actions Failure
+              if: ${{failure()}}
+              run: |
+                  echo "ACTIONS_STATUS=⛔ Failure" >> $GITHUB_ENV
+                  echo "COLOR=#FF0000" >> $GITHUB_ENV
+
+            - name: If Actions Success
+              if: ${{success()}}
+              run: |
+                  echo "ACTIONS_STATUS=✅ Success" >> $GITHUB_ENV
+                  echo "COLOR=#36a64f" >> $GITHUB_ENV
+
+            - name: Send Slack Message
+              if: ${{always()}}
+              id: slack
+              uses: slackapi/slack-github-action@v1.24.0
+              with:
+                  payload: |
+                      {
+                          "text": "${{github.repository}} actions result: ${{env.ACTIONS_STATUS}}",
+                          "blocks": [
+                              {
+                                  "type": "header",
+                                  "text": {
+                                      "type": "plain_text",
+                                      "text": "Actions Result : ${{env.ACTIONS_STATUS}}"
+                                  }
+                              }
+                          ],
+                          "attachments": [
+                              {
+                                  "color": "${{env.COLOR}}",
+                                  "blocks": [
+                                      {
+                                          "type": "section",
+                                          "fields": [
+                                              {
+                                                  "type": "mrkdwn",
+                                                  "text": "*Run ID*\n<${{github.server_url}}/${{github.repository}}/actions/runs/${{github.run_id}} | ${{github.run_id}}>"
+                                              },
+                                              {
+                                                  "type": "mrkdwn",
+                                                  "text": "*Run Number*\n${{github.run_number}}"
+                                              }
+                                          ]
+                                      },
+                                      {
+                                          "type": "section",
+                                          "fields": [
+                                              {
+                                                  "type": "mrkdwn",
+                                                  "text": "*Repository:*\n<${{github.server_url}}/${{github.repository}} | ${{github.repository}}>"
+                                              },
+                                              {
+                                                  "type": "mrkdwn",
+                                                  "text": "*Author:*\n${{github.actor}}"
+                                              },
+                                              {
+                                                  "type": "mrkdwn",
+                                                  "text": "*Commit:*\n<${{github.event.head_commit.url}} | ${{env.SHORT_GITHUB_SHA}}>"
+                                              },
+                                              {
+                                                  "type": "mrkdwn",
+                                                  "text": "*Branch*\n${{github.ref_name}}"
+                                              }
+                                          ]
+                                      },
+                                      {
+                                          "type": "section",
+                                          "text": {
+                                              "type": "mrkdwn",
+                                              "text": "*Commit Message:*\n${{github.event.head_commit.message}}"
+                                          }
+                                      }
+                                  ]
+                              }
+                          ]
+                        }
+
+              env:
+                  SLACK_WEBHOOK_URL: ${{secrets.SLACK_WEBHOOK_URL}}
+                  SLACK_WEBHOOK_TYPE: INCOMING_WEBHOOK
